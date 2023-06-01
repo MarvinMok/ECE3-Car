@@ -4,9 +4,9 @@ uint16_t sensorValues[8];
 int turn_around_count = 0;
 int last_right;
 int last_left;
-const int minimums[8] =  {574, 597, 597, 597, 592, 666, 727, 690} ;
-const int maximums[8] = {1854, 1730, 1801, 1265, 1450, 1781, 1773, 1810};
-const int scaling_factor[8] = { -4, -3, -2, -1, 1, 2, 3, 4};
+const int minimums[8] =  {552, 552, 552, 552, 528, 623, 670, 646};
+const int maximums = 2100;
+int scaling_factor[8] = { -4, -3, -2, -1, 1, 2, 3, 4};
 
 const int left_nslp_pin = 31; // nslp ==> awake & ready for PWM
 const int left_dir_pin = 29;
@@ -20,11 +20,11 @@ const int right_nslp_pin = 11; // nslp ==> awake & ready for PWM
 const int right_dir_pin = 30;
 const int right_pwm_pin = 39;
 
-const float kp = 0.375;
-const float kd = 2.75;
+float kp = 0.425;
+float kd = 0;
 
 
-const int q_size = 3;
+const int q_size = 1;
 
 //ArduinoQueue<int> errorQ(q_size);
 int errorArr[q_size];
@@ -32,7 +32,10 @@ unsigned char loc = 0;
 int curError;
 int sum;
 
-int base_speed = 70;
+int encoder_count = 0;
+
+bool turned = false;
+int base_speed = 60;
 
 int getDError();
 int getError();
@@ -42,11 +45,13 @@ int getError();
 void changeWheelSpeed(int li, int lf, int ri, int rf);
 void setup()
 {
-
+  ECE3_Init();
+  
   resetEncoderCount_left();
   resetEncoderCount_right();
+
+  encoder_count = getEncoderCount_left();
   
-  ECE3_Init();
   Serial.begin(9600); // set the data rate in bits per second for serial data transmission
 
   pinMode(left_nslp_pin, OUTPUT);
@@ -63,6 +68,7 @@ void setup()
   digitalWrite(left_dir_pin, LOW);
   digitalWrite(right_dir_pin, LOW);
 
+  ECE3_read_IR(sensorValues);
   curError = getError();
 
   for (int i = 0; i < q_size; i++)
@@ -70,17 +76,20 @@ void setup()
     //errorQ.enqueue(curError);
     errorArr[i] = curError;
   }
-  sum = curError + curError >> 2;
+  sum = curError * q_size;
   
   delay(2000);
 
-  changeWheelSpeed(0, base_speed, 0, base_speed);  
+  //changeWheelSpeed(0, base_speed, 0, base_speed);
+  analogWrite(left_pwm_pin, base_speed);
+  analogWrite(right_pwm_pin, base_speed);  
   
 }
 
 
 void loop()
 {
+  encoder_count = (getEncoderCount_left() + getEncoderCount_right()) / 2;
   // read raw sensor values
   ECE3_read_IR(sensorValues);
 
@@ -94,24 +103,65 @@ void loop()
   //   }
   //   Serial.println();
 
+   //Serial.println(encoder_count);
 
-  //Serial.println(curError);
-  //Serial.println(d_error);
-
-//  turnAroundTest();
-//  if (turn_around_count > 3)
-//  {
-//    turnAround();
-//  }
-//  else
-//  {
-    analogWrite(left_pwm_pin, base_speed - kp * curError - kd * d_error);
-    analogWrite(right_pwm_pin, base_speed + kp * curError + kd * d_error);
+  if (encoder_count > 3450 && encoder_count < 4300)
+  {
+    scaling_factor[0] = 0;
+    scaling_factor[7] = 0;
     
- // }
+    base_speed = 25;
+    ChangeBaseSpeeds(last_left, base_speed - kp * curError - kd * d_error, last_right, base_speed + kp * curError + kd * d_error);
+    
+    
+  }
+  else if (encoder_count >= 4200)
+  {
+    scaling_factor[0] = -4;
+    scaling_factor[7] = 4;
+    
+    base_speed = 70;
+    ChangeBaseSpeeds(last_left, base_speed - kp * curError - kd * d_error, last_right, base_speed + kp * curError + kd * d_error);
+  }
+  else
+  {
+    turnAroundTest();
+    if (turn_around_count > 2)
+    {
+      if (!turned)
+      {
+        turnAround();
+      }
+      else
+      {
+        kd = 0;
+        kp = 0;
+        base_speed = 0;
+        ChangeBaseSpeeds(last_left, 0, last_right,0);
+        exit(0);
+      }
+      
+    }
+    else
+    {
+  //    Serial.println(curError);
+  //    for(int i = 0; i < 3; i++)
+  //    {
+  //      Serial.print(i);
+  //      Serial.print(": ");
+  //      Serial.println(errorArr[i]);
+  //    }
+  //    Serial.println(d_error);
+  //
+      last_left = base_speed - kp * curError - kd * d_error;
+      last_right = base_speed + kp * curError + kd * d_error;
+      analogWrite(left_pwm_pin, last_left);
+      analogWrite(right_pwm_pin, last_right);
+  
+    }
+  }
 
-
-  //delay(100);
+  //delay(1000);
 }
 
 
@@ -129,16 +179,15 @@ int getError()
   int error = 0;
   for (unsigned char i = 0;  i < 8; i++)
   {
-    error += scaling_factor[i] * (sensorValues[i] - minimums[i]) / (float) (maximums[i] - minimums[i]) * 25;
+    error += scaling_factor[i] * (sensorValues[i] - minimums[i]) / (float) (maximums - minimums[i]) * 25;
   }
   return error;
 }
 
 void turnAroundTest()
 {
-
   bool b = true;
-  for (unsigned char i = 0; i < 8; i++)
+  for (unsigned char i = 1; i < 7; i++)
   {
     if (sensorValues[i] < 2000)
     {
@@ -167,20 +216,25 @@ void turnAround()
 
   int cur_left = getEncoderCount_left();
 
-  changeWheelSpeed(last_right, 0, last_right, 0);
-  
-  while (getEncoderCount_left() - cur_left < 310)
+  analogWrite(left_pwm_pin, 0);
+  analogWrite(right_pwm_pin, 0);
+  digitalWrite(left_dir_pin, LOW);
+  digitalWrite(right_dir_pin, HIGH);
+  while (getEncoderCount_left() - cur_left < 340)
   {
+    
     analogWrite(left_pwm_pin, base_speed);
-    analogWrite(right_pwm_pin, -base_speed);
+    analogWrite(right_pwm_pin, base_speed);
+    
   }
 
-  while (getEncoderCount_left() - cur_left < 340) //dont pound gears too hard;
-  {
-    analogWrite(left_pwm_pin, base_speed / 2);
-    analogWrite(right_pwm_pin, -base_speed / 2);
-  }
-  
+  analogWrite(left_pwm_pin, 0);
+  analogWrite(right_pwm_pin, 0);
+  digitalWrite(left_dir_pin, LOW);
+  digitalWrite(right_dir_pin, LOW);
+
+  turn_around_count = 0;
+  turned = true; 
 }
 
 void changeWheelSpeed(int li, int lf, int ri, int rf)
@@ -204,3 +258,34 @@ void changeWheelSpeed(int li, int lf, int ri, int rf)
   last_right = rf;
   last_left = lf;
 }
+
+//---------------------------------------------------------
+void ChangeBaseSpeeds(int initialLeftSpd,int finalLeftSpd,int
+initialRightSpd,int finalRightSpd) {
+  /*
+  * This function changes the car speed gradually (in about 30 ms) from
+  initial
+  * speed to final speed. This non-instantaneous speed change reduces the
+  load
+  * on the plastic geartrain, and reduces the failure rate of the motors.
+  */
+  int diffLeft = finalLeftSpd-initialLeftSpd;
+  int diffRight = finalRightSpd-initialRightSpd;
+  int stepIncrement = 20;
+  int numStepsLeft = abs(diffLeft)/stepIncrement;
+  int numStepsRight = abs(diffRight)/stepIncrement;
+  int numSteps = max(numStepsLeft,numStepsRight);
+  int pwmLeftVal = initialLeftSpd; // initialize left wheel speed
+  int pwmRightVal = initialRightSpd; // initialize right wheel speed
+  int deltaLeft = (diffLeft)/numSteps; // left in(de)crement
+  int deltaRight = (diffRight)/numSteps; // right in(de)crement
+  for(int k=0;k<numSteps;k++) {
+    pwmLeftVal = pwmLeftVal + deltaLeft;
+    pwmRightVal = pwmRightVal + deltaRight;
+    analogWrite(left_pwm_pin,pwmLeftVal);
+    analogWrite(right_pwm_pin,pwmRightVal);
+    delay(30);
+  } // end for int k
+  analogWrite(left_pwm_pin,finalLeftSpd);
+  analogWrite(right_pwm_pin,finalRightSpd);
+} 
