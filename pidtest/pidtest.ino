@@ -21,8 +21,9 @@ const int right_dir_pin = 30;
 const int right_pwm_pin = 39;
 
 float kp = 0.425;
-float kd = 0;
+float kd = 2.5;
 
+bool changedSpeed = false;
 
 const int q_size = 1;
 
@@ -35,7 +36,7 @@ int sum;
 int encoder_count = 0;
 
 bool turned = false;
-int base_speed = 60;
+int base_speed = 50;
 
 int getDError();
 int getError();
@@ -105,62 +106,68 @@ void loop()
 
    //Serial.println(encoder_count);
 
-  if (encoder_count > 3450 && encoder_count < 4300)
+  if (encoder_count >= 2000 && encoder_count < 2005) {
+    base_speed = 90;
+    int new_right = base_speed + kp * curError + kd * d_error;
+    int new_left = base_speed - kp * curError - kd * d_error;
+    ChangeBaseSpeeds(last_left, new_left, last_right, new_right);
+  }
+  else if (encoder_count >= 3500 && encoder_count < 3505)
   {
     scaling_factor[0] = 0;
     scaling_factor[7] = 0;
+    kp = 0.55;
+    kd = 0.3;
     
-    base_speed = 25;
-    ChangeBaseSpeeds(last_left, base_speed - kp * curError - kd * d_error, last_right, base_speed + kp * curError + kd * d_error);
-    
-    
+    base_speed = 20;
+    int new_right = base_speed + kp * curError + kd * d_error;
+    int new_left = base_speed - kp * curError - kd * d_error;
+    ChangeBaseSpeeds(last_left, new_left, last_right, new_right);
+    last_left = new_left;
+    last_right = new_right;
+//    delay(100);
+//    analogWrite(right_pwm_pin, 20);
+//    delay(5);
+//    analogWrite(left_pwm_pin, 20);
+//    delay(10);
   }
-  else if (encoder_count >= 4200)
+  else if (encoder_count >= 4050 && encoder_count < 4055)
   {
     scaling_factor[0] = -4;
     scaling_factor[7] = 4;
     
-    base_speed = 70;
-    ChangeBaseSpeeds(last_left, base_speed - kp * curError - kd * d_error, last_right, base_speed + kp * curError + kd * d_error);
+    base_speed = 50;
+    kd = 2.5;
+
+    int new_right = base_speed + kp * curError + kd * d_error;
+    int new_left = base_speed - kp * curError - kd * d_error;
+    ChangeBaseSpeeds(last_left, new_left, last_right, new_right);
+    last_left = new_left;
+    last_right = new_right;
   }
-  else
+  turnAroundTest();
+  if (turn_around_count > 1)
   {
-    turnAroundTest();
-    if (turn_around_count > 2)
+    if (!turned)
     {
-      if (!turned)
-      {
-        turnAround();
-      }
-      else
-      {
-        kd = 0;
-        kp = 0;
-        base_speed = 0;
-        ChangeBaseSpeeds(last_left, 0, last_right,0);
-        exit(0);
-      }
-      
+      turnAround();
+      turned = true;
     }
     else
     {
-  //    Serial.println(curError);
-  //    for(int i = 0; i < 3; i++)
-  //    {
-  //      Serial.print(i);
-  //      Serial.print(": ");
-  //      Serial.println(errorArr[i]);
-  //    }
-  //    Serial.println(d_error);
-  //
-      last_left = base_speed - kp * curError - kd * d_error;
-      last_right = base_speed + kp * curError + kd * d_error;
-      analogWrite(left_pwm_pin, last_left);
-      analogWrite(right_pwm_pin, last_right);
-  
+//      base_speed = 0;
+//      ChangeBaseSpeeds(last_left, 0, last_right,0);
+      analogWrite(left_pwm_pin, 0);
+      analogWrite(right_pwm_pin, 0);
+      exit(0);
     }
+  } else {
+    last_left = base_speed - kp * curError - kd * d_error;
+    last_right = base_speed + kp * curError + kd * d_error;
+    analogWrite(left_pwm_pin, last_left);
+    analogWrite(right_pwm_pin, last_right);
   }
-
+  
   //delay(1000);
 }
 
@@ -179,6 +186,10 @@ int getError()
   int error = 0;
   for (unsigned char i = 0;  i < 8; i++)
   {
+    if (sensorValues[i] < minimums[i])
+    {
+      sensorValues[i] = minimums[i];
+    }
     error += scaling_factor[i] * (sensorValues[i] - minimums[i]) / (float) (maximums - minimums[i]) * 25;
   }
   return error;
@@ -186,15 +197,16 @@ int getError()
 
 void turnAroundTest()
 {
-  bool b = true;
+  bool b = false;
+  uint16_t s = 0;
   for (unsigned char i = 1; i < 7; i++)
   {
-    if (sensorValues[i] < 2000)
-    {
-      b = false;
-    }
+    s += sensorValues[i];
   }
-
+  if (s / 6 > 1950)
+  {
+    b = true;
+  }
   if (b)
   {
     turn_around_count++;
@@ -220,11 +232,11 @@ void turnAround()
   analogWrite(right_pwm_pin, 0);
   digitalWrite(left_dir_pin, LOW);
   digitalWrite(right_dir_pin, HIGH);
-  while (getEncoderCount_left() - cur_left < 340)
+  while (getEncoderCount_left() - cur_left < 350)
   {
     
-    analogWrite(left_pwm_pin, base_speed);
-    analogWrite(right_pwm_pin, base_speed);
+    analogWrite(left_pwm_pin, 90);
+    analogWrite(right_pwm_pin, 90);
     
   }
 
@@ -234,7 +246,6 @@ void turnAround()
   digitalWrite(right_dir_pin, LOW);
 
   turn_around_count = 0;
-  turned = true; 
 }
 
 void changeWheelSpeed(int li, int lf, int ri, int rf)
