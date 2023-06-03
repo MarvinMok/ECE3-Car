@@ -20,7 +20,7 @@ const int right_nslp_pin = 11; // nslp ==> awake & ready for PWM
 const int right_dir_pin = 30;
 const int right_pwm_pin = 39;
 
-float kp = 0.425;
+float kp = 0.475;
 float kd = 2.5;
 
 bool changedSpeed = false;
@@ -36,7 +36,7 @@ int sum;
 int encoder_count = 0;
 
 bool turned = false;
-int base_speed = 50;
+int base_speed = 60;
 
 int getDError();
 int getError();
@@ -106,13 +106,13 @@ void loop()
 
    //Serial.println(encoder_count);
 
-  if (encoder_count >= 2000 && encoder_count < 2005) {
-    base_speed = 90;
+  if (encoder_count >= 2010 && encoder_count < 2015) {
+    base_speed = 150;
     int new_right = base_speed + kp * curError + kd * d_error;
     int new_left = base_speed - kp * curError - kd * d_error;
     ChangeBaseSpeeds(last_left, new_left, last_right, new_right);
   }
-  else if (encoder_count >= 3500 && encoder_count < 3505)
+  else if (encoder_count >= 3400 && encoder_count < 3410)
   {
     scaling_factor[0] = 0;
     scaling_factor[7] = 0;
@@ -131,12 +131,13 @@ void loop()
 //    analogWrite(left_pwm_pin, 20);
 //    delay(10);
   }
-  else if (encoder_count >= 4050 && encoder_count < 4055)
+  else if (encoder_count >= 3950 && encoder_count < 3955)
   {
     scaling_factor[0] = -4;
     scaling_factor[7] = 4;
     
-    base_speed = 50;
+    base_speed = 60;
+    kp = 0.45;
     kd = 2.5;
 
     int new_right = base_speed + kp * curError + kd * d_error;
@@ -144,6 +145,18 @@ void loop()
     ChangeBaseSpeeds(last_left, new_left, last_right, new_right);
     last_left = new_left;
     last_right = new_right;
+  }
+  if (encoder_count >= 6650 && encoder_count < 6655) {
+    base_speed = 130;
+    int new_right = base_speed + kp * curError + kd * d_error;
+    int new_left = base_speed - kp * curError - kd * d_error;
+    ChangeBaseSpeeds(last_left, new_left, last_right, new_right);
+  }
+  if (encoder_count >= 7950 && encoder_count < 7960) {
+    base_speed = 50;
+    int new_right = base_speed + kp * curError + kd * d_error;
+    int new_left = base_speed - kp * curError - kd * d_error;
+    ChangeBaseSpeeds(last_left, new_left, last_right, new_right);
   }
   turnAroundTest();
   if (turn_around_count > 1)
