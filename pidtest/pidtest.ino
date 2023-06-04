@@ -20,7 +20,7 @@ const int right_nslp_pin = 11; // nslp ==> awake & ready for PWM
 const int right_dir_pin = 30;
 const int right_pwm_pin = 39;
 
-float kp = 0.475;
+float kp = 0.5;
 float kd = 2.5;
 
 bool changedSpeed = false;
@@ -107,16 +107,18 @@ void loop()
    //Serial.println(encoder_count);
 
   if (encoder_count >= 2010 && encoder_count < 2015) {
-    base_speed = 150;
+    base_speed = 130;
     int new_right = base_speed + kp * curError + kd * d_error;
     int new_left = base_speed - kp * curError - kd * d_error;
     ChangeBaseSpeeds(last_left, new_left, last_right, new_right);
+    last_left = new_left;
+    last_right = new_right;
   }
-  else if (encoder_count >= 3400 && encoder_count < 3410)
+  else if (encoder_count >= 3350 && encoder_count < 3360)
   {
     scaling_factor[0] = 0;
     scaling_factor[7] = 0;
-    kp = 0.55;
+    kp = 0.6;
     kd = 0.3;
     
     base_speed = 20;
@@ -131,7 +133,7 @@ void loop()
 //    analogWrite(left_pwm_pin, 20);
 //    delay(10);
   }
-  else if (encoder_count >= 3950 && encoder_count < 3955)
+  else if (encoder_count >= 3900 && encoder_count < 3905)
   {
     scaling_factor[0] = -4;
     scaling_factor[7] = 4;
@@ -146,39 +148,44 @@ void loop()
     last_left = new_left;
     last_right = new_right;
   }
-  if (encoder_count >= 6650 && encoder_count < 6655) {
+  else if (encoder_count >= 6650 && encoder_count < 6655) {
     base_speed = 130;
     int new_right = base_speed + kp * curError + kd * d_error;
     int new_left = base_speed - kp * curError - kd * d_error;
     ChangeBaseSpeeds(last_left, new_left, last_right, new_right);
+    last_left = new_left;
+    last_right = new_right;
   }
-  if (encoder_count >= 7950 && encoder_count < 7960) {
+  else if (encoder_count >= 7800 && encoder_count < 7810) {
     base_speed = 50;
     int new_right = base_speed + kp * curError + kd * d_error;
     int new_left = base_speed - kp * curError - kd * d_error;
     ChangeBaseSpeeds(last_left, new_left, last_right, new_right);
+    last_left = new_left;
+    last_right = new_right;
   }
-  turnAroundTest();
-  if (turn_around_count > 1)
-  {
-    if (!turned)
+  else {
+    turnAroundTest();
+    if (turn_around_count > 1)
     {
-      turnAround();
-      turned = true;
+      if (!turned)
+      {
+        turnAround();
+        turned = true;
+      }
+      else
+      {
+  //     ChangeBaseSpeeds(last_left, 0, last_right, 0);
+        analogWrite(left_pwm_pin, 0);
+        analogWrite(right_pwm_pin, 0);
+        exit(0);
+      }
+    } else {
+      last_left = base_speed - kp * curError - kd * d_error;
+      last_right = base_speed + kp * curError + kd * d_error;
+      analogWrite(left_pwm_pin, last_left);
+      analogWrite(right_pwm_pin, last_right);
     }
-    else
-    {
-//      base_speed = 0;
-//      ChangeBaseSpeeds(last_left, 0, last_right,0);
-      analogWrite(left_pwm_pin, 0);
-      analogWrite(right_pwm_pin, 0);
-      exit(0);
-    }
-  } else {
-    last_left = base_speed - kp * curError - kd * d_error;
-    last_right = base_speed + kp * curError + kd * d_error;
-    analogWrite(left_pwm_pin, last_left);
-    analogWrite(right_pwm_pin, last_right);
   }
   
   //delay(1000);
